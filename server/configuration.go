@@ -121,5 +121,11 @@ func (p *Plugin) OnConfigurationChange() error {
 
 	p.setConfiguration(configuration)
 
+	// Initialize or reinitialize the moderator with the new configuration
+	if err := p.initModerator(); err != nil {
+		p.API.LogError("Failed to reinitialize moderator after configuration change", "err", err)
+		return errors.Wrap(err, "failed to reinitialize moderator")
+	}
+
 	return nil
 }
