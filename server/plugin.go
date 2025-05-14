@@ -27,6 +27,7 @@ type Plugin struct {
 	client    *pluginapi.Client
 	moderator moderation.Moderator
 
+	// configurationLock synchronizes access to the configuration.
 	configurationLock sync.RWMutex
 	configuration     *configuration
 

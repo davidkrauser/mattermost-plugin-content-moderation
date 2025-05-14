@@ -22,13 +22,13 @@ import (
 type configuration struct {
 	Enabled  bool   `json:"enabled"`
 	Type     string `json:"type"`
-	Endpoint string `json:"endpoint"`
-	APIKey   string `json:"apiKey"`
+	Endpoint string `json:"azure_endpoint"`
+	APIKey   string `json:"azure_apiKey"`
 
 	ModerationTargets string `json:"moderationTargets"`
 	ModerateAllUsers  bool   `json:"moderateAllUsers"`
 
-	Threshold string `json:"threshold"`
+	Threshold string `json:"azure_threshold"`
 }
 
 func (c *configuration) ModerationTargetsList() map[string]struct{} {

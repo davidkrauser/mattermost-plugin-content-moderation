@@ -43,17 +43,18 @@
                 ]
             },
             {
-                "key": "endpoint",
-                "display_name": "API Endpoint",
+                "key": "azure_endpoint",
+                "display_name": "Azure API Endpoint",
                 "type": "text",
-                "help_text": "The endpoint URL for the moderation API.",
+                "help_text": "The endpoint URL for the Azure API.",
                 "placeholder": "https://your-resource.cognitiveservices.azure.com/"
             },
             {
-                "key": "apiKey",
-                "display_name": "API Key",
+                "key": "azure_apiKey",
+                "display_name": "Azure API Key",
                 "type": "text",
-                "help_text": "Your moderation API key.",
+                "secret": true,
+                "help_text": "Your Azure API key.",
                 "placeholder": "Enter your API key here"
             },
             {
@@ -70,11 +71,11 @@
                 "help_text": "If not moderating all users, the plugin moderates content from these User IDs."
             },
             {
-                "key": "threshold",
-                "display_name": "Content Moderation Threshold",
+                "key": "azure_threshold",
+                "display_name": "Azure Moderation Threshold",
                 "type": "dropdown",
                 "help_text": "Severity threshold for all content categories (Low filters most aggressively).",
-                "default": "4",
+                "default": "2",
                 "options": [
                     {
                         "display_name": "Low (2)",
