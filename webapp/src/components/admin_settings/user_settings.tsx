@@ -62,7 +62,7 @@ class UserSettings extends React.Component<UserSettingsProps, UserSettingsState>
     render() {
         return (
             <UsersInput
-                placeholder='Search for users to moderate'
+                placeholder='Search for users to exclude from moderation'
                 users={this.state.users}
                 onChange={this.handleChange}
                 actions={{

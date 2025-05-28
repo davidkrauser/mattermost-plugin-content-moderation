@@ -196,54 +196,41 @@ func TestQueueAndPopPost(t *testing.T) {
 
 func TestShouldModerateUser(t *testing.T) {
 	tests := []struct {
-		name        string
-		targetAll   bool
-		targetUsers map[string]struct{}
-		userID      string
-		expected    bool
+		name          string
+		excludedUsers map[string]struct{}
+		userID        string
+		expected      bool
 	}{
 		{
-			name:        "Target all users",
-			targetAll:   true,
-			targetUsers: map[string]struct{}{},
-			userID:      "any_user",
-			expected:    true,
+			name:          "User not excluded",
+			excludedUsers: map[string]struct{}{},
+			userID:        "any_user",
+			expected:      true,
 		},
 		{
-			name:        "Target specific user - match",
-			targetAll:   false,
-			targetUsers: map[string]struct{}{"user1": {}, "user2": {}},
-			userID:      "user1",
-			expected:    true,
+			name:          "User is excluded",
+			excludedUsers: map[string]struct{}{"user1": {}, "user2": {}},
+			userID:        "user1",
+			expected:      false,
 		},
 		{
-			name:        "Target specific user - no match",
-			targetAll:   false,
-			targetUsers: map[string]struct{}{"user1": {}, "user2": {}},
-			userID:      "user3",
-			expected:    false,
+			name:          "User not in excluded list",
+			excludedUsers: map[string]struct{}{"user1": {}, "user2": {}},
+			userID:        "user3",
+			expected:      true,
 		},
 		{
-			name:        "Empty target list",
-			targetAll:   false,
-			targetUsers: map[string]struct{}{},
-			userID:      "any_user",
-			expected:    false,
-		},
-		{
-			name:        "Target all and specific users",
-			targetAll:   true,
-			targetUsers: map[string]struct{}{"user1": {}, "user2": {}},
-			userID:      "user3",
-			expected:    true, // targetAll takes precedence
+			name:          "Empty excluded list",
+			excludedUsers: map[string]struct{}{},
+			userID:        "any_user",
+			expected:      true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			processor := &PostProcessor{
-				targetAll:   tt.targetAll,
-				targetUsers: tt.targetUsers,
+				excludedUsers: tt.excludedUsers,
 			}
 
 			result := processor.shouldModerateUser(tt.userID)
@@ -254,17 +241,16 @@ func TestShouldModerateUser(t *testing.T) {
 
 // Only test the simple cases to avoid race conditions in the test
 func TestModeratePost(t *testing.T) {
-	t.Run("Skip moderation for non-targeted user", func(t *testing.T) {
+	t.Run("Skip moderation for excluded user", func(t *testing.T) {
 		mockAPI := &plugintest.API{}
 		mockModerator := &MockModerator{}
 
 		processor := &PostProcessor{
-			moderator:   mockModerator,
-			targetAll:   false,
-			targetUsers: map[string]struct{}{"user1": {}, "user2": {}},
+			moderator:     mockModerator,
+			excludedUsers: map[string]struct{}{"user1": {}, "user2": {}},
 		}
 
-		post := &model.Post{UserId: "user3", Message: "Test message"}
+		post := &model.Post{UserId: "user1", Message: "Test message"}
 		err := processor.moderatePost(mockAPI, post)
 
 		assert.NoError(t, err)
@@ -276,8 +262,8 @@ func TestModeratePost(t *testing.T) {
 		mockModerator := &MockModerator{}
 
 		processor := &PostProcessor{
-			moderator: mockModerator,
-			targetAll: true,
+			moderator:     mockModerator,
+			excludedUsers: map[string]struct{}{},
 		}
 
 		post := &model.Post{UserId: "user1", Message: ""}
@@ -297,7 +283,7 @@ func TestModeratePost(t *testing.T) {
 
 		processor := &PostProcessor{
 			moderator:      mockModerator,
-			targetAll:      true,
+			excludedUsers:  map[string]struct{}{},
 			thresholdValue: 50,
 		}
 
@@ -317,7 +303,7 @@ func TestModeratePost(t *testing.T) {
 
 		processor := &PostProcessor{
 			moderator:      mockModerator,
-			targetAll:      true,
+			excludedUsers:  map[string]struct{}{},
 			thresholdValue: 50,
 		}
 
@@ -343,7 +329,7 @@ func TestModeratePost(t *testing.T) {
 
 		processor := &PostProcessor{
 			moderator:      mockModerator,
-			targetAll:      true,
+			excludedUsers:  map[string]struct{}{},
 			thresholdValue: 50,
 		}
 
@@ -362,8 +348,7 @@ func TestNewPostProcessor(t *testing.T) {
 		botID          string
 		moderator      moderation.Moderator
 		thresholdValue int
-		targetAll      bool
-		targetUsers    map[string]struct{}
+		excludedUsers  map[string]struct{}
 		wantErr        bool
 		expectedErr    error
 	}{
@@ -372,8 +357,7 @@ func TestNewPostProcessor(t *testing.T) {
 			botID:          "bot123",
 			moderator:      &MockModerator{},
 			thresholdValue: 75,
-			targetAll:      true,
-			targetUsers:    map[string]struct{}{"user1": {}},
+			excludedUsers:  map[string]struct{}{"user1": {}},
 			wantErr:        false,
 		},
 		{
@@ -381,8 +365,7 @@ func TestNewPostProcessor(t *testing.T) {
 			botID:          "bot123",
 			moderator:      nil,
 			thresholdValue: 75,
-			targetAll:      true,
-			targetUsers:    map[string]struct{}{"user1": {}},
+			excludedUsers:  map[string]struct{}{"user1": {}},
 			wantErr:        true,
 			expectedErr:    ErrModerationUnavailable,
 		},
@@ -391,24 +374,22 @@ func TestNewPostProcessor(t *testing.T) {
 			botID:          "bot123",
 			moderator:      &MockModerator{},
 			thresholdValue: 0,
-			targetAll:      false,
-			targetUsers:    map[string]struct{}{"user1": {}},
+			excludedUsers:  map[string]struct{}{"user1": {}},
 			wantErr:        false,
 		},
 		{
-			name:           "No target users",
+			name:           "No excluded users",
 			botID:          "bot123",
 			moderator:      &MockModerator{},
 			thresholdValue: 75,
-			targetAll:      false,
-			targetUsers:    map[string]struct{}{},
+			excludedUsers:  map[string]struct{}{},
 			wantErr:        false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor, err := newPostProcessor(tt.botID, tt.moderator, tt.thresholdValue, tt.targetAll, tt.targetUsers)
+			processor, err := newPostProcessor(tt.botID, tt.moderator, tt.thresholdValue, tt.excludedUsers)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -422,8 +403,7 @@ func TestNewPostProcessor(t *testing.T) {
 				assert.Equal(t, tt.botID, processor.botID)
 				assert.Equal(t, tt.moderator, processor.moderator)
 				assert.Equal(t, tt.thresholdValue, processor.thresholdValue)
-				assert.Equal(t, tt.targetAll, processor.targetAll)
-				assert.Equal(t, tt.targetUsers, processor.targetUsers)
+				assert.Equal(t, tt.excludedUsers, processor.excludedUsers)
 				assert.NotNil(t, processor.stopChan)
 				assert.Empty(t, processor.postsToProcess)
 			}
