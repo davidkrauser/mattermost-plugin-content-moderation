@@ -20,10 +20,9 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
-	Enabled           bool   `json:"enabled"`
-	ModerationTargets string `json:"moderationTargets"`
-	ModerateAllUsers  bool   `json:"moderateAllUsers"`
-	BotUsername       string `json:"botUsername"`
+	Enabled       bool   `json:"enabled"`
+	ExcludedUsers string `json:"excludedUsers"`
+	BotUsername   string `json:"botUsername"`
 
 	Type string `json:"type"`
 
@@ -32,17 +31,18 @@ type configuration struct {
 	Threshold string `json:"azure_threshold"`
 }
 
-func (c *configuration) ModerationTargetsList() map[string]struct{} {
-	if c.ModerationTargets == "" {
-		return nil
+func (c *configuration) ExcludedUserSet() map[string]struct{} {
+	excludedMap := make(map[string]struct{})
+	if strings.TrimSpace(c.ExcludedUsers) == "" {
+		return excludedMap
 	}
-	targetMap := make(map[string]struct{})
-	for _, targetID := range strings.Split(c.ModerationTargets, ",") {
-		if targetID != "" {
-			targetMap[targetID] = struct{}{}
+	for _, userID := range strings.Split(c.ExcludedUsers, ",") {
+		trimmedID := strings.TrimSpace(userID)
+		if trimmedID != "" {
+			excludedMap[trimmedID] = struct{}{}
 		}
 	}
-	return targetMap
+	return excludedMap
 }
 
 // ThresholdValue returns the threshold as an integer
@@ -104,8 +104,7 @@ func (p *Plugin) setConfiguration(configuration *configuration) {
 
 	p.API.LogInfo("Moderation configuration changed",
 		"moderationEnabled", configuration.Enabled,
-		"moderationAllUsers", configuration.ModerateAllUsers,
-		"moderationTargets", configuration.ModerationTargets,
+		"excludedUsers", configuration.ExcludedUsers,
 		"moderationThreshold", configuration.Threshold,
 		"botUsername", configuration.BotUsername)
 

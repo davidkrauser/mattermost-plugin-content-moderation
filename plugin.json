@@ -58,17 +58,10 @@
                 "placeholder": "Enter your API key here"
             },
             {
-                "key": "moderateAllUsers",
-                "display_name": "Moderate All Users",
-                "type": "bool",
-                "help_text": "When true, content from all users will be moderated. When false, only content from specified users will be moderated.",
-                "default": false
-            },
-            {
-                "key": "moderationTargets",
-                "display_name": "Moderation Targets",
+                "key": "excludedUsers",
+                "display_name": "Excluded Users",
                 "type": "custom",
-                "help_text": "If not moderating all users, the plugin moderates content from these User IDs."
+                "help_text": "Users to exclude from content moderation. All others will be moderated."
             },
             {
                 "key": "botUsername",

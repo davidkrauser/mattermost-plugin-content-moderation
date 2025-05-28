@@ -38,8 +38,7 @@ type PostProcessor struct {
 	stopChan chan bool
 
 	thresholdValue int
-	targetAll      bool
-	targetUsers    map[string]struct{}
+	excludedUsers  map[string]struct{}
 
 	postsToProcess []*model.Post
 	processLock    sync.Mutex
@@ -49,8 +48,7 @@ func newPostProcessor(
 	botID string,
 	moderator moderation.Moderator,
 	thresholdValue int,
-	targetAll bool,
-	targetUsers map[string]struct{},
+	excludedUsers map[string]struct{},
 ) (*PostProcessor, error) {
 	if moderator == nil {
 		return nil, ErrModerationUnavailable
@@ -60,8 +58,7 @@ func newPostProcessor(
 		moderator:      moderator,
 		stopChan:       make(chan bool, 1),
 		thresholdValue: thresholdValue,
-		targetAll:      targetAll,
-		targetUsers:    targetUsers,
+		excludedUsers:  excludedUsers,
 	}, nil
 }
 
@@ -156,11 +153,11 @@ func (p *PostProcessor) shouldModerateUser(userID string) bool {
 	if userID == p.botID {
 		return false
 	}
-	if p.targetAll {
+	if len(p.excludedUsers) == 0 {
 		return true
 	}
-	_, exists := p.targetUsers[userID]
-	return exists
+	_, excluded := p.excludedUsers[userID]
+	return !excluded
 }
 
 func (p *PostProcessor) resultSeverityAboveThreshold(result moderation.Result) bool {

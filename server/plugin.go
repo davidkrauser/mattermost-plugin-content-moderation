@@ -52,11 +52,7 @@ func (p *Plugin) initialize() error {
 		return errors.Wrap(err, "could not initialize bot user")
 	}
 
-	targetUsers := config.ModerationTargetsList()
-	if len(targetUsers) == 0 && !config.ModerateAllUsers {
-		p.API.LogInfo("Content moderation is targeting no users")
-		return nil
-	}
+	excludedUsers := config.ExcludedUserSet()
 
 	thresholdValue, err := config.ThresholdValue()
 	if err != nil {
@@ -70,7 +66,7 @@ func (p *Plugin) initialize() error {
 	}
 
 	processor, err := newPostProcessor(
-		botID, moderator, thresholdValue, config.ModerateAllUsers, targetUsers)
+		botID, moderator, thresholdValue, excludedUsers)
 	if err != nil {
 		p.API.LogError("failed to create post processor", "err", err)
 		return errors.Wrap(err, "failed to create post processor")
