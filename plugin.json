@@ -64,6 +64,12 @@
                 "help_text": "Users to exclude from content moderation. All others will be moderated."
             },
             {
+                "key": "excludedGroups",
+                "display_name": "Excluded Groups",
+                "type": "custom",
+                "help_text": "User groups to exclude from content moderation. All members of these groups will be excluded."
+            },
+            {
                 "key": "botUsername",
                 "display_name": "Bot Username",
                 "type": "text",

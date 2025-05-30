@@ -39,6 +39,7 @@ type PostProcessor struct {
 
 	thresholdValue int
 	excludedUsers  map[string]struct{}
+	excludedGroups map[string]struct{}
 
 	postsToProcess []*model.Post
 	processLock    sync.Mutex
@@ -49,6 +50,7 @@ func newPostProcessor(
 	moderator moderation.Moderator,
 	thresholdValue int,
 	excludedUsers map[string]struct{},
+	excludedGroups map[string]struct{},
 ) (*PostProcessor, error) {
 	if moderator == nil {
 		return nil, ErrModerationUnavailable
@@ -59,6 +61,7 @@ func newPostProcessor(
 		stopChan:       make(chan bool, 1),
 		thresholdValue: thresholdValue,
 		excludedUsers:  excludedUsers,
+		excludedGroups: excludedGroups,
 	}, nil
 }
 
@@ -74,12 +77,20 @@ func (p *PostProcessor) start(api plugin.API) {
 			time.Sleep(processingInterval)
 
 			post := p.popPostForProcessing()
-			if post == nil {
+			if post == nil || post.Message == "" {
 				continue
 			}
 
-			err := p.moderatePost(api, post)
-			if err == nil {
+			shouldModerate, err := p.shouldModerateUser(api, post.UserId)
+			if err != nil {
+				api.LogError("Could not determine if user should be moderated", "err", err, "post_id", post.Id, "user_id", post.UserId)
+				continue
+			}
+			if !shouldModerate {
+				continue
+			}
+
+			if err := p.moderatePost(api, post); err != nil {
 				continue
 			}
 
@@ -125,14 +136,6 @@ func (p *PostProcessor) popPostForProcessing() *model.Post {
 }
 
 func (p *PostProcessor) moderatePost(api plugin.API, post *model.Post) error {
-	if !p.shouldModerateUser(post.UserId) {
-		return nil
-	}
-
-	if post.Message == "" {
-		return nil
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), moderationTimeout)
 	defer cancel()
 
@@ -149,15 +152,26 @@ func (p *PostProcessor) moderatePost(api plugin.API, post *model.Post) error {
 	return nil
 }
 
-func (p *PostProcessor) shouldModerateUser(userID string) bool {
+func (p *PostProcessor) shouldModerateUser(api plugin.API, userID string) (bool, error) {
 	if userID == p.botID {
-		return false
+		return false, nil
 	}
 	if len(p.excludedUsers) == 0 {
-		return true
+		return true, nil
 	}
-	_, excluded := p.excludedUsers[userID]
-	return !excluded
+	if _, excluded := p.excludedUsers[userID]; excluded {
+		return false, nil
+	}
+	groups, err := api.GetGroupsForUser(userID)
+	if err != nil {
+		return false, err
+	}
+	for _, group := range groups {
+		if _, excluded := p.excludedGroups[group.Id]; excluded {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (p *PostProcessor) resultSeverityAboveThreshold(result moderation.Result) bool {

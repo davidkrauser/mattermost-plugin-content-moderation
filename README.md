@@ -11,7 +11,7 @@ The Content Moderation Plugin allows Mattermost administrators to ensure all con
 Key features:
 - Text content moderation (hate speech, sexual content, violence, self-harm)
 - Configuration with a single moderation threshold
-- Moderation of all users with ability to exclude specific users
+- Moderation of all users with ability to exclude specific users and groups
 
 ## Installation
 
@@ -30,7 +30,8 @@ Configuration options:
 | Type | Moderation provider type (currently only "azure" is supported) |
 | Azure Endpoint | Azure API endpoint |
 | Azure API Key | Azure API key (kept secure) |
-| Excluded Users | User IDs to exclude from content moderation. All other users will be moderated |
+| Excluded Users | Users to exclude from content moderation. All other users will be moderated |
+| Excluded Groups | Groups to exclude from content moderation. All members of these groups will be excluded |
 | Azure Threshold | Single severity threshold applied to all content categories |
 
 The Azure AI Content Safety API uses severity levels from 0-6:

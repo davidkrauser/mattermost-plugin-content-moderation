@@ -20,9 +20,10 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
-	Enabled       bool   `json:"enabled"`
-	ExcludedUsers string `json:"excludedUsers"`
-	BotUsername   string `json:"botUsername"`
+	Enabled        bool   `json:"enabled"`
+	ExcludedUsers  string `json:"excludedUsers"`
+	ExcludedGroups string `json:"excludedGroups"`
+	BotUsername    string `json:"botUsername"`
 
 	Type string `json:"type"`
 
@@ -40,6 +41,19 @@ func (c *configuration) ExcludedUserSet() map[string]struct{} {
 		trimmedID := strings.TrimSpace(userID)
 		if trimmedID != "" {
 			excludedMap[trimmedID] = struct{}{}
+		}
+	}
+	return excludedMap
+}
+
+func (c *configuration) ExcludedGroupsList() map[string]struct{} {
+	if c.ExcludedGroups == "" {
+		return nil
+	}
+	excludedMap := make(map[string]struct{})
+	for _, groupID := range strings.Split(c.ExcludedGroups, ",") {
+		if groupID != "" {
+			excludedMap[groupID] = struct{}{}
 		}
 	}
 	return excludedMap
@@ -105,6 +119,7 @@ func (p *Plugin) setConfiguration(configuration *configuration) {
 	p.API.LogInfo("Moderation configuration changed",
 		"moderationEnabled", configuration.Enabled,
 		"excludedUsers", configuration.ExcludedUsers,
+		"excludedGroups", configuration.ExcludedGroups,
 		"moderationThreshold", configuration.Threshold,
 		"botUsername", configuration.BotUsername)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mattermost/mattermost-plugin-content-moderation/server/moderation"
 	"github.com/mattermost/mattermost-plugin-content-moderation/server/moderation/azure"
+	"github.com/mattermost/mattermost-plugin-content-moderation/server/store/sqlstore"
 	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin"
 	"github.com/mattermost/mattermost/server/public/pluginapi"
@@ -20,6 +21,8 @@ type Plugin struct {
 
 	configurationLock sync.RWMutex
 	configuration     *configuration
+
+	sqlStore *sqlstore.SQLStore
 
 	processor *PostProcessor
 }
@@ -53,6 +56,7 @@ func (p *Plugin) initialize() error {
 	}
 
 	excludedUsers := config.ExcludedUserSet()
+	excludedGroups := config.ExcludedGroupsList()
 
 	thresholdValue, err := config.ThresholdValue()
 	if err != nil {
@@ -60,13 +64,24 @@ func (p *Plugin) initialize() error {
 		return errors.Wrap(err, "failed to load moderation threshold")
 	}
 
+	// Setup direct store access
+	client := pluginapi.NewClient(p.API, p.Driver)
+	SQLStore, err := sqlstore.New(client.Store, &client.Log)
+	if err != nil {
+		p.API.LogError("cannot create SQLStore", "err", err)
+		return err
+	}
+	p.sqlStore = SQLStore
+	// FIXME: do we need to handle MM configuration changes?
+
 	moderator, err := initModerator(p.API, config)
 	if err != nil {
-		return errors.Wrap(err, "failed to initialize moderator")
+		p.API.LogError("failed to initialize moderator", "err", err)
+		return nil
 	}
 
 	processor, err := newPostProcessor(
-		botID, moderator, thresholdValue, excludedUsers)
+		botID, moderator, thresholdValue, excludedUsers, excludedGroups)
 	if err != nil {
 		p.API.LogError("failed to create post processor", "err", err)
 		return errors.Wrap(err, "failed to create post processor")
