@@ -410,3 +410,67 @@ func TestNewPostProcessor(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigurationMethods(t *testing.T) {
+	t.Run("ExcludedUsersList with valid users", func(t *testing.T) {
+		config := &configuration{
+			ExcludedUsers: "user1,user2,user3",
+		}
+
+		result := config.ExcludedUsersList()
+		expected := map[string]struct{}{
+			"user1": {},
+			"user2": {},
+			"user3": {},
+		}
+
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("ExcludedUsersList with empty string", func(t *testing.T) {
+		config := &configuration{
+			ExcludedUsers: "",
+		}
+
+		result := config.ExcludedUsersList()
+		assert.Nil(t, result)
+	})
+
+	t.Run("ExcludedGroupsList with valid groups", func(t *testing.T) {
+		config := &configuration{
+			ExcludedGroups: "group1,group2,group3",
+		}
+
+		result := config.ExcludedGroupsList()
+		expected := map[string]struct{}{
+			"group1": {},
+			"group2": {},
+			"group3": {},
+		}
+
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("ExcludedGroupsList with empty string", func(t *testing.T) {
+		config := &configuration{
+			ExcludedGroups: "",
+		}
+
+		result := config.ExcludedGroupsList()
+		assert.Nil(t, result)
+	})
+
+	t.Run("ExcludedUsersList with empty values", func(t *testing.T) {
+		config := &configuration{
+			ExcludedUsers: "user1,,user3,",
+		}
+
+		result := config.ExcludedUsersList()
+		expected := map[string]struct{}{
+			"user1": {},
+			"user3": {},
+		}
+
+		assert.Equal(t, expected, result)
+	})
+}
