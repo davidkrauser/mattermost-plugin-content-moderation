@@ -83,7 +83,7 @@ This shows which post was flagged, the configured threshold, and the computed se
 ## Roadmap
 
 - [ ] Implement notification blocking for posts under moderation
-- [ ] Support writing moderation events to the Audit log
+- [X] Support writing moderation events to the Audit log
 - [ ] Add local LLM option as the moderator backend
 - [ ] Support excluding users from moderation by group
 - [ ] Support moderating text attachments

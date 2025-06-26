@@ -97,6 +97,13 @@
                         "value": "6"
                     }
                 ]
+            },
+            {
+                "key": "auditLoggingEnabled",
+                "display_name": "Enable Audit Logging",
+                "type": "bool",
+                "help_text": "When true, content moderation actions will be logged to the audit log for compliance tracking. Note: This setting has no effect unless audit logging is configured at the server level.",
+                "default": false
             }
         ]
     }

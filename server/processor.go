@@ -26,25 +26,35 @@ const (
 	dmNotificationTemplate      = "_Your post with the following content was flagged and removed:_\n\n%s"
 )
 
+// Audit event constants
+const (
+	auditEventTypeContentModeration = "contentModeration"
+	auditMetaKeyFlagged             = "flagged"
+	auditMetaKeyResult              = "result"
+	auditMetaKeyThreshold           = "threshold"
+	auditMetaKeyExcluded            = "excluded"
+	auditMetaKeyPost                = "post"
+)
+
 var (
 	ErrModerationRejection   = errors.New("potentially inappropriate content detected")
 	ErrModerationUnavailable = errors.New("moderation service is not available")
 )
 
 type PostProcessor struct {
-	botID     string
-	moderator moderation.Moderator
-
+	botID            string
+	moderator        moderation.Moderator
+	auditLogEnabled  bool
 	thresholdValue   int
 	excludedUsers    map[string]struct{}
 	excludedChannels map[string]struct{}
-
-	postsCh chan *model.Post
+	postsCh          chan *model.Post
 }
 
 func newPostProcessor(
 	botID string,
 	moderator moderation.Moderator,
+	auditLogEnabled bool,
 	thresholdValue int,
 	excludedUsers map[string]struct{},
 	excludedChannels map[string]struct{},
@@ -55,6 +65,7 @@ func newPostProcessor(
 	return &PostProcessor{
 		botID:            botID,
 		moderator:        moderator,
+		auditLogEnabled:  auditLogEnabled,
 		thresholdValue:   thresholdValue,
 		excludedUsers:    excludedUsers,
 		excludedChannels: excludedChannels,
@@ -72,23 +83,37 @@ func (p *PostProcessor) start(api plugin.API) {
 
 			time.Sleep(processingInterval)
 
-			err := p.moderatePost(api, post)
+			record := plugin.MakeAuditRecord(auditEventTypeContentModeration, model.AuditStatusAttempt)
+			model.AddEventParameterAuditableToAuditRec(record, auditMetaKeyPost, post)
+
+			err := p.moderatePost(api, post, record)
 			if err == nil {
+				p.logAuditSuccess(api, record)
 				continue
 			}
 
 			if errors.Is(err, ErrModerationUnavailable) {
-				api.LogError("Content moderation error", "err", err, "post_id", post.Id, "user_id", post.UserId)
+				errMsg := "Content moderation error"
+				api.LogError(errMsg, "err", err, "post_id", post.Id, "user_id", post.UserId)
+				p.logAuditFail(api, record, errMsg, err)
 				continue
 			}
 
 			if err := api.DeletePost(post.Id); err != nil {
-				api.LogError("Failed to delete post flagged by content moderation", "post_id", post.Id, "err", err)
+				errMsg := "Failed to delete post flagged by content moderation"
+				api.LogError(errMsg, "post_id", post.Id, "err", err)
+				p.logAuditFail(api, record, errMsg, err)
+				continue
 			}
 
 			if err := p.reportModerationEvent(api, post); err != nil {
-				api.LogError("Failed report content moderation event", "post_id", post.Id, "err", err)
+				errMsg := "Failed report content moderation event"
+				api.LogError(errMsg, "post_id", post.Id, "err", err)
+				p.logAuditFail(api, record, errMsg, err)
+				continue
 			}
+
+			p.logAuditSuccess(api, record)
 		}
 	}()
 }
@@ -111,18 +136,22 @@ func (p *PostProcessor) queuePostForProcessing(api plugin.API, post *model.Post)
 	}
 }
 
-func (p *PostProcessor) moderatePost(api plugin.API, post *model.Post) error {
+func (p *PostProcessor) moderatePost(api plugin.API, post *model.Post, auditRecord *model.AuditRecord) error {
+	if post.Message == "" {
+		return nil
+	}
+
 	if !p.shouldModerateUser(post.UserId) {
+		auditRecord.AddMeta(auditMetaKeyExcluded, true)
 		return nil
 	}
 
 	if !p.shouldModerateChannel(post.ChannelId) {
+		auditRecord.AddMeta(auditMetaKeyExcluded, true)
 		return nil
 	}
 
-	if post.Message == "" {
-		return nil
-	}
+	auditRecord.AddMeta(auditMetaKeyExcluded, false)
 
 	ctx, cancel := context.WithTimeout(context.Background(), moderationTimeout)
 	defer cancel()
@@ -132,11 +161,16 @@ func (p *PostProcessor) moderatePost(api plugin.API, post *model.Post) error {
 		return ErrModerationUnavailable
 	}
 
+	auditRecord.AddMeta(auditMetaKeyThreshold, p.thresholdValue)
+	auditRecord.AddMeta(auditMetaKeyResult, result)
+
 	if p.resultSeverityAboveThreshold(result) {
+		auditRecord.AddMeta(auditMetaKeyFlagged, true)
 		p.logFlaggedResult(api, post.Id, result)
 		return ErrModerationRejection
 	}
 
+	auditRecord.AddMeta(auditMetaKeyFlagged, false)
 	return nil
 }
 
@@ -205,4 +239,21 @@ func (p *PostProcessor) reportModerationEvent(api plugin.API, post *model.Post) 
 	}
 
 	return nil
+}
+
+func (p *PostProcessor) logAuditSuccess(api plugin.API, auditRecord *model.AuditRecord) {
+	if !p.auditLogEnabled {
+		return
+	}
+	auditRecord.Success()
+	api.LogAuditRec(auditRecord)
+}
+
+func (p *PostProcessor) logAuditFail(api plugin.API, auditRecord *model.AuditRecord, errDesc string, err error) {
+	if !p.auditLogEnabled {
+		return
+	}
+	auditRecord.Fail()
+	auditRecord.AddErrorDesc(errors.Wrap(err, errDesc).Error())
+	api.LogAuditRec(auditRecord)
 }
